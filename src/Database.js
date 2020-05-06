@@ -1,6 +1,6 @@
 import Realm from 'realm';
 import { generateUUID } from './utilities';
-import { CHANGE_TYPES } from '../index';
+import { CHANGE_TYPES } from './constants';
 
 export class Database {
 
@@ -8,10 +8,12 @@ export class Database {
    * Create a new database with the given schema.
    * @param  {object} schema Contains a schema and a schemaVersion, in the format
    *                         expected by Realm
+   * @param  {object} extraFields Extra fields to initialise realm database with
+   *                         new database(schema, { path: 'pathToFile.realm' });
    * @return {none}
    */
-  constructor(schema) {
-    this.realm = new Realm(schema);
+  constructor(schema, extraFields = {}) {
+    this.realm = new Realm({ ...extraFields, ...schema });
     this.listeners = new Map();
   }
 
@@ -72,6 +74,20 @@ export class Database {
   }
 
   /**
+   * Returns the database object with the given id.
+   * @param  {string} type             The type of database object
+   * @param  {string} primaryKey       The primary key of the database object, usually its id
+   * @param  {string} primaryKeyField  The field used as the primary key, defaults to 'id'
+   * @return {Realm.object}            The existing database object with the given
+   *                                   primary key, or null if it does not exist.
+   */
+  get(type, primaryKey, primaryKeyField = 'id') {
+    if (!primaryKey || primaryKey.length < 1) return null;
+    const results = this.objects(type).filtered(`${primaryKeyField} == $0`, primaryKey);
+    return (results.length > 0) ? results[0] : null;
+  }
+
+  /**
    * Returns the database object with the given id, if it exists, or creates a
    * placeholder with that id if it doesn't.
    * @param  {string} type             The type of database object
@@ -82,8 +98,8 @@ export class Database {
    */
   getOrCreate(type, primaryKey, primaryKeyField = 'id', ...listenerArgs) {
     if (!primaryKey || primaryKey.length < 1) return null;
-    const results = this.objects(type).filtered(`${primaryKeyField} == $0`, primaryKey);
-    if (results.length > 0) return results[0];
+    const record = this.get(type, primaryKey, primaryKeyField);
+    if (record) return record; 
     return this.create(type, { [primaryKeyField]: primaryKey }, ...listenerArgs);
   }
 
